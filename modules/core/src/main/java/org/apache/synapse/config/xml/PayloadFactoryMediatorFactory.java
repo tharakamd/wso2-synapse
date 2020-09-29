@@ -26,6 +26,7 @@ import org.apache.synapse.Mediator;
 import org.apache.synapse.mediators.Value;
 import org.apache.synapse.mediators.transform.Argument;
 import org.apache.synapse.mediators.transform.PayloadFactoryMediator;
+import org.apache.synapse.mediators.transform.pfutils.RegexTemplateProcessor;
 import org.apache.synapse.util.xpath.SynapseXPath;
 import org.jaxen.JaxenException;
 
@@ -55,17 +56,21 @@ public class PayloadFactoryMediatorFactory extends AbstractMediatorFactory {
     public Mediator createSpecificMediator(OMElement elem, Properties properties) {
 
         PayloadFactoryMediator payloadFactoryMediator = new PayloadFactoryMediator();
+        RegexTemplateProcessor templateProcessor = new RegexTemplateProcessor();
         processAuditStatus(payloadFactoryMediator, elem);
         String mediaTypeValue = elem.getAttributeValue(TYPE_Q);
         //for the backward compatibility.
         if(mediaTypeValue != null) {
-            payloadFactoryMediator.setType(mediaTypeValue); //set the mediaType for the PF
+//            payloadFactoryMediator.setType(mediaTypeValue); //set the mediaType for the PF
+            templateProcessor.setType(mediaTypeValue);
         } else {
-            payloadFactoryMediator.setType(XML_TYPE);
+//            payloadFactoryMediator.setType(XML_TYPE);
+            templateProcessor.setType(XML_TYPE);
         }
 
         boolean escapeXmlCharsValue = Boolean.parseBoolean(elem.getAttributeValue(ESCAPE_XML_CHARS_Q));
-        payloadFactoryMediator.setEscapeXmlChars(escapeXmlCharsValue); //set the escape xml chars in json payloads for the PF
+//        payloadFactoryMediator.setEscapeXmlChars(escapeXmlCharsValue); //set the escape xml chars in json payloads for the PF
+        templateProcessor.setEscapeXmlChars(escapeXmlCharsValue);
 
         OMElement formatElem = elem.getFirstChildWithName(FORMAT_Q);
         if (formatElem != null) {
@@ -115,7 +120,8 @@ public class PayloadFactoryMediatorFactory extends AbstractMediatorFactory {
                 if ((value = argElem.getAttributeValue(ATT_VALUE)) != null) {
                     arg.setValue(value);
                     arg.setExpression(null);
-                    payloadFactoryMediator.addPathArgument(arg);
+//                    payloadFactoryMediator.addPathArgument(arg);
+                    templateProcessor.addPathArgument(arg);
                 } else if ((value = argElem.getAttributeValue(ATT_EXPRN)) != null) {
                     if (value.trim().length() == 0) {
                         handleException("Attribute value for xpath cannot be empty");
@@ -131,14 +137,16 @@ public class PayloadFactoryMediatorFactory extends AbstractMediatorFactory {
                                 // we have to explicitly define the path type since we are not going to mark
                                 // JSON Path's with prefix "json-eval(".
                                 arg.getExpression().setPathType(SynapsePath.JSON_PATH);
-                                payloadFactoryMediator.addPathArgument(arg);
+//                                payloadFactoryMediator.addPathArgument(arg);
+                                templateProcessor.addPathArgument(arg);
                             } else {
                                 SynapseXPath sxp = SynapseXPathFactory.getSynapseXPath(argElem, ATT_EXPRN);
                                 //we need to disable stream Xpath forcefully
                                 sxp.setForceDisableStreamXpath(Boolean.TRUE);
                                 arg.setExpression(sxp);
                                 arg.getExpression().setPathType(SynapsePath.X_PATH);
-                                payloadFactoryMediator.addPathArgument(arg);
+//                                payloadFactoryMediator.addPathArgument(arg);
+                                templateProcessor.addPathArgument(arg);
                             }
                         } catch (JaxenException e) {
                             handleException("Invalid XPath expression for attribute expression : " +
@@ -155,6 +163,7 @@ public class PayloadFactoryMediatorFactory extends AbstractMediatorFactory {
 
         addAllCommentChildrenToList(elem, payloadFactoryMediator.getCommentsList());
 
+        payloadFactoryMediator.setTemplateProcessor(templateProcessor);
         return payloadFactoryMediator;
     }
 

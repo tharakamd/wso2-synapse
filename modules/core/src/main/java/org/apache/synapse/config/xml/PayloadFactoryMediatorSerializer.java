@@ -107,7 +107,7 @@ public class PayloadFactoryMediatorSerializer extends AbstractMediatorSerializer
         }
 
         OMElement argumentsElem = fac.createOMElement(ARGS, synNS);
-        List<Argument> pathArgList = mediator.getPathArgumentList();
+        List<Argument> pathArgList = mediator.getTemplateProcessor().getPathArgumentList();
 
         if (null != pathArgList && pathArgList.size() > 0) {
 
