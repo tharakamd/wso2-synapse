@@ -44,7 +44,7 @@ public class RegexTemplateProcessor extends TemplateProcessor {
      */
     private void replace(String format, StringBuffer result, String mediaType, MessageContext synCtx) {
 
-        HashMap<String, ArgumentDetails>[] argValues = getArgValues(synCtx);
+        HashMap<String, ArgumentDetails>[] argValues = getArgValues(mediaType,synCtx);
         HashMap<String, ArgumentDetails> replacement;
         Map.Entry<String, ArgumentDetails> replacementEntry;
         String replacementValue = null;

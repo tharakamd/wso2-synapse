@@ -21,6 +21,7 @@ package org.apache.synapse.mediators.transform;
 import junit.framework.TestCase;
 import org.apache.synapse.MessageContext;
 import org.apache.synapse.mediators.TestUtils;
+import org.apache.synapse.mediators.transform.pfutils.RegexTemplateProcessor;
 import org.apache.synapse.util.xpath.SynapseXPath;
 
 import java.text.SimpleDateFormat;
@@ -59,6 +60,7 @@ public class PayloadFactoryMediatorTest extends TestCase {
     public void testWithStaticArguments() throws Exception {
 
         PayloadFactoryMediator payloadFactoryMediator = new PayloadFactoryMediator();
+        payloadFactoryMediator.setTemplateProcessor(new RegexTemplateProcessor());
         payloadFactoryMediator.setFormat(format);
 
         //prepare arguments
@@ -72,10 +74,10 @@ public class PayloadFactoryMediatorTest extends TestCase {
         argument4.setValue("Colombo, Sri Lanka");
 
         //add arguments
-        payloadFactoryMediator.addPathArgument(argument1);
-        payloadFactoryMediator.addPathArgument(argument2);
-        payloadFactoryMediator.addPathArgument(argument3);
-        payloadFactoryMediator.addPathArgument(argument4);
+        payloadFactoryMediator.getTemplateProcessor().addPathArgument(argument1);
+        payloadFactoryMediator.getTemplateProcessor().addPathArgument(argument2);
+        payloadFactoryMediator.getTemplateProcessor().addPathArgument(argument3);
+        payloadFactoryMediator.getTemplateProcessor().addPathArgument(argument4);
 
         //do mediation
         MessageContext synCtx = TestUtils.getAxis2MessageContext(inputPayload, null);
@@ -100,6 +102,7 @@ public class PayloadFactoryMediatorTest extends TestCase {
     public void testWithExpressionsAsArguments() throws Exception {
 
         PayloadFactoryMediator payloadFactoryMediator = new PayloadFactoryMediator();
+        payloadFactoryMediator.setTemplateProcessor(new RegexTemplateProcessor());
         payloadFactoryMediator.setFormat(format);
         //prepare arguments
         Argument argument1 = new Argument();
@@ -112,10 +115,10 @@ public class PayloadFactoryMediatorTest extends TestCase {
         argument4.setExpression(new SynapseXPath("//address"));
 
         //add arguments
-        payloadFactoryMediator.addPathArgument(argument1);
-        payloadFactoryMediator.addPathArgument(argument2);
-        payloadFactoryMediator.addPathArgument(argument3);
-        payloadFactoryMediator.addPathArgument(argument4);
+        payloadFactoryMediator.getTemplateProcessor().addPathArgument(argument1);
+        payloadFactoryMediator.getTemplateProcessor().addPathArgument(argument2);
+        payloadFactoryMediator.getTemplateProcessor().addPathArgument(argument3);
+        payloadFactoryMediator.getTemplateProcessor().addPathArgument(argument4);
 
         //do mediation
         MessageContext synCtx = TestUtils.getAxis2MessageContext(inputPayload, null);

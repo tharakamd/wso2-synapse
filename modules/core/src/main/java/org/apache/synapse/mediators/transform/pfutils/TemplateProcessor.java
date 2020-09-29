@@ -45,7 +45,6 @@ public abstract class TemplateProcessor {
     protected final static String ESCAPE_CRETURN_WITH_EIGHT_BACK_SLASHES = "\\\\\\\\r";
     protected final static String ESCAPE_TAB_WITH_EIGHT_BACK_SLASHES = "\\\\\\\\t";
     protected final XMLInputFactory inputFactory = XMLInputFactory.newInstance();
-    private String mediaType = XML_TYPE;
     private boolean escapeXmlChars = false;
     private final List<Argument> pathArgumentList = new ArrayList<>();
 
@@ -60,7 +59,7 @@ public abstract class TemplateProcessor {
      * @param synCtx
      * @return
      */
-    protected HashMap<String, ArgumentDetails>[] getArgValues(MessageContext synCtx) {
+    protected HashMap<String, ArgumentDetails>[] getArgValues(String mediaType, MessageContext synCtx) {
 
         HashMap<String, ArgumentDetails>[] argValues = new HashMap[pathArgumentList.size()];
         HashMap<String, ArgumentDetails> valueMap;
@@ -82,7 +81,7 @@ public abstract class TemplateProcessor {
                     // XML escape the result of an expression that produces a literal, if the target format
                     // of the payload is XML.
                     details.setXml(isXML(value));
-                    if (!details.isXml() && XML_TYPE.equals(getType()) && !isJson(value.trim(), arg.getExpression())) {
+                    if (!details.isXml() && XML_TYPE.equals(mediaType) && !isJson(value.trim(), arg.getExpression())) {
                         value = escapeXMLEnvelope(synCtx, value);
                     }
                     value = Matcher.quoteReplacement(value);
@@ -319,16 +318,6 @@ public abstract class TemplateProcessor {
     public void setEscapeXmlChars(boolean escapeXmlChars) {
 
         this.escapeXmlChars = escapeXmlChars;
-    }
-
-    public String getType() {
-
-        return mediaType;
-    }
-
-    public void setType(String type) {
-
-        this.mediaType = type;
     }
 
     public void addPathArgument(Argument arg) {

@@ -61,11 +61,9 @@ public class PayloadFactoryMediatorFactory extends AbstractMediatorFactory {
         String mediaTypeValue = elem.getAttributeValue(TYPE_Q);
         //for the backward compatibility.
         if(mediaTypeValue != null) {
-//            payloadFactoryMediator.setType(mediaTypeValue); //set the mediaType for the PF
-            templateProcessor.setType(mediaTypeValue);
+            payloadFactoryMediator.setType(mediaTypeValue); //set the mediaType for the PF
         } else {
-//            payloadFactoryMediator.setType(XML_TYPE);
-            templateProcessor.setType(XML_TYPE);
+            payloadFactoryMediator.setType(XML_TYPE);
         }
 
         boolean escapeXmlCharsValue = Boolean.parseBoolean(elem.getAttributeValue(ESCAPE_XML_CHARS_Q));
