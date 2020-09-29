@@ -41,6 +41,7 @@ import org.apache.synapse.config.xml.SynapsePath;
 import org.apache.synapse.core.axis2.Axis2MessageContext;
 import org.apache.synapse.mediators.AbstractMediator;
 import org.apache.synapse.mediators.Value;
+import org.apache.synapse.mediators.transform.pfutils.TemplateProcessor;
 import org.apache.synapse.util.AXIOMUtils;
 import org.apache.synapse.util.xpath.SynapseJsonPath;
 import org.apache.synapse.util.xpath.SynapseXPath;
@@ -96,6 +97,8 @@ public class PayloadFactoryMediator extends AbstractMediator {
     private List<Argument> pathArgumentList = new ArrayList<Argument>();
     private Pattern pattern = Pattern.compile("\\$(\\d)+");
     private static Pattern validJsonNumber = Pattern.compile("^-?(0|([1-9]\\d*))(\\.\\d+)?([eE][+-]?\\d+)?$");
+
+    private TemplateProcessor templateProcessor;
 
     private static final Log log = LogFactory.getLog(PayloadFactoryMediator.class);
 
@@ -225,9 +228,11 @@ public class PayloadFactoryMediator extends AbstractMediator {
             } else if (entry instanceof String) {
                 text = (String) entry;
             }
-            replace(text, result, synCtx);
+//            replace(text, result, synCtx);
+            result.append(templateProcessor.processTemplate(text, mediaType, synCtx));
         } else {
-            replace(format, result, synCtx);
+//            replace(format, result, synCtx);
+            result.append(templateProcessor.processTemplate(format, mediaType, synCtx));
         }
     }
 
@@ -756,5 +761,10 @@ public class PayloadFactoryMediator extends AbstractMediator {
         javax.xml.stream.XMLStreamReader xmlReader = inputFactory.createXMLStreamReader(new StringReader(value));
         StAXBuilder builder = new StAXOMBuilder(xmlReader);
         return builder.getDocumentElement();
+    }
+
+    public void setTemplateProcessor(TemplateProcessor templateProcessor) {
+
+        this.templateProcessor = templateProcessor;
     }
 }

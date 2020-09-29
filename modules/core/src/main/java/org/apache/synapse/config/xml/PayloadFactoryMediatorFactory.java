@@ -26,6 +26,7 @@ import org.apache.synapse.Mediator;
 import org.apache.synapse.mediators.Value;
 import org.apache.synapse.mediators.transform.Argument;
 import org.apache.synapse.mediators.transform.PayloadFactoryMediator;
+import org.apache.synapse.mediators.transform.pfutils.RegexTemplateProcessor;
 import org.apache.synapse.util.xpath.SynapseXPath;
 import org.jaxen.JaxenException;
 
@@ -55,17 +56,22 @@ public class PayloadFactoryMediatorFactory extends AbstractMediatorFactory {
     public Mediator createSpecificMediator(OMElement elem, Properties properties) {
 
         PayloadFactoryMediator payloadFactoryMediator = new PayloadFactoryMediator();
+        RegexTemplateProcessor templateProcessor = new RegexTemplateProcessor();
+
         processAuditStatus(payloadFactoryMediator, elem);
         String mediaTypeValue = elem.getAttributeValue(TYPE_Q);
         //for the backward compatibility.
         if(mediaTypeValue != null) {
             payloadFactoryMediator.setType(mediaTypeValue); //set the mediaType for the PF
+            templateProcessor.setType(mediaTypeValue);
         } else {
             payloadFactoryMediator.setType(XML_TYPE);
+            templateProcessor.setType(XML_TYPE);
         }
 
         boolean escapeXmlCharsValue = Boolean.parseBoolean(elem.getAttributeValue(ESCAPE_XML_CHARS_Q));
         payloadFactoryMediator.setEscapeXmlChars(escapeXmlCharsValue); //set the escape xml chars in json payloads for the PF
+        templateProcessor.setEscapeXmlChars(escapeXmlCharsValue);
 
         OMElement formatElem = elem.getFirstChildWithName(FORMAT_Q);
         if (formatElem != null) {
@@ -154,7 +160,7 @@ public class PayloadFactoryMediatorFactory extends AbstractMediatorFactory {
         }
 
         addAllCommentChildrenToList(elem, payloadFactoryMediator.getCommentsList());
-
+        payloadFactoryMediator.setTemplateProcessor(templateProcessor);
         return payloadFactoryMediator;
     }
 
