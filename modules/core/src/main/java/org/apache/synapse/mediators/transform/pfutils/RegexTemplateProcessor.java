@@ -44,7 +44,7 @@ public class RegexTemplateProcessor extends TemplateProcessor {
      */
     private void replace(String format, StringBuffer result, String mediaType, MessageContext synCtx) {
 
-        HashMap<String, ArgumentDetails>[] argValues = getArgValues(mediaType,synCtx);
+        HashMap<String, ArgumentDetails>[] argValues = getArgValues(mediaType, synCtx);
         HashMap<String, ArgumentDetails> replacement;
         Map.Entry<String, ArgumentDetails> replacementEntry;
         String replacementValue = null;
@@ -75,10 +75,9 @@ public class RegexTemplateProcessor extends TemplateProcessor {
                         replacementValue = escapeSpecialCharactersOfJson(replacementValue);
                     } catch (XMLStreamException e) {
                         handleException(
-                                "Error parsing XML for JSON conversion, please check your xPath expressions return valid XML: ",
-                                synCtx);
+                                "Error parsing XML for JSON conversion, please check your xPath expressions return valid XML: ");
                     } catch (AxisFault e) {
-                        handleException("Error converting XML to JSON", synCtx);
+                        handleException("Error converting XML to JSON");
                     } catch (OMException e) {
                         //if the logic comes to this means, it was tried as a XML, which means it has
                         // "<" as starting element and ">" as end element, so basically if the logic comes here, that means
@@ -109,8 +108,7 @@ public class RegexTemplateProcessor extends TemplateProcessor {
                         //replacementValue = omXML.toString();
                     } catch (AxisFault e) {
                         handleException(
-                                "Error converting JSON to XML, please check your JSON Path expressions return valid JSON: ",
-                                synCtx);
+                                "Error converting JSON to XML, please check your JSON Path expressions return valid JSON: ");
                     }
                 } else {
                     // No conversion required, as path evaluates to regular String.
@@ -134,7 +132,7 @@ public class RegexTemplateProcessor extends TemplateProcessor {
                             }
                         } catch (AxisFault e) {
                             handleException("Error converting JSON to XML, please check your JSON Path expressions"
-                                    + " return valid JSON: ", synCtx);
+                                    + " return valid JSON: ");
                         }
                     } else if (mediaType.equals(JSON_TYPE) &&
                             inferReplacementType(replacementEntry).equals(JSON_TYPE) &&

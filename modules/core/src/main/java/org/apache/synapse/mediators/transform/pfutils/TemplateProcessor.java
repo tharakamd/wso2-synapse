@@ -89,7 +89,7 @@ public abstract class TemplateProcessor {
                     value = "";
                 }
             } else {
-                handleException("Unexpected arg type detected", synCtx);
+                handleException("Unexpected arg type detected");
             }
             //value = value.replace(String.valueOf((char) 160), " ").trim();
             valueMap = new HashMap<>();
@@ -330,8 +330,8 @@ public abstract class TemplateProcessor {
         return pathArgumentList;
     }
 
-    // todo :: replace with a exception based mechanism
-    protected void handleException(String msg, MessageContext msgContext) {
+    protected void handleException(String msg)  {
 
+        throw new TemplateProcessorException(msg);
     }
 }

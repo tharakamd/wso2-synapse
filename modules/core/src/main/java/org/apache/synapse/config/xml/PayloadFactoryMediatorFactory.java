@@ -26,7 +26,9 @@ import org.apache.synapse.Mediator;
 import org.apache.synapse.mediators.Value;
 import org.apache.synapse.mediators.transform.Argument;
 import org.apache.synapse.mediators.transform.PayloadFactoryMediator;
+import org.apache.synapse.mediators.transform.pfutils.FreeMarkerTemplateProcessor;
 import org.apache.synapse.mediators.transform.pfutils.RegexTemplateProcessor;
+import org.apache.synapse.mediators.transform.pfutils.TemplateProcessor;
 import org.apache.synapse.util.xpath.SynapseXPath;
 import org.jaxen.JaxenException;
 
@@ -56,7 +58,7 @@ public class PayloadFactoryMediatorFactory extends AbstractMediatorFactory {
     public Mediator createSpecificMediator(OMElement elem, Properties properties) {
 
         PayloadFactoryMediator payloadFactoryMediator = new PayloadFactoryMediator();
-        RegexTemplateProcessor templateProcessor = new RegexTemplateProcessor();
+        TemplateProcessor templateProcessor = getTemplateProcessor();
         processAuditStatus(payloadFactoryMediator, elem);
         String mediaTypeValue = elem.getAttributeValue(TYPE_Q);
         //for the backward compatibility.
@@ -163,6 +165,11 @@ public class PayloadFactoryMediatorFactory extends AbstractMediatorFactory {
 
         payloadFactoryMediator.setTemplateProcessor(templateProcessor);
         return payloadFactoryMediator;
+    }
+
+    private TemplateProcessor getTemplateProcessor() {
+
+        return new FreeMarkerTemplateProcessor();
     }
 
     public QName getTagQName() {

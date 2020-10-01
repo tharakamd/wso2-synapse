@@ -40,6 +40,7 @@ import org.apache.synapse.core.axis2.Axis2MessageContext;
 import org.apache.synapse.mediators.AbstractMediator;
 import org.apache.synapse.mediators.Value;
 import org.apache.synapse.mediators.transform.pfutils.TemplateProcessor;
+import org.apache.synapse.mediators.transform.pfutils.TemplateProcessorException;
 import org.apache.synapse.util.AXIOMUtils;
 import org.apache.synapse.util.xpath.SynapseJsonPath;
 import org.apache.synapse.util.xpath.SynapseXPath;
@@ -167,9 +168,18 @@ public class PayloadFactoryMediator extends AbstractMediator {
             } else if (entry instanceof String) {
                 text = (String) entry;
             }
-            result.append(templateProcessor.processTemplate(text, mediaType, synCtx));
+            processTemplate(result, synCtx, text);
         } else {
-            result.append(templateProcessor.processTemplate(format, mediaType, synCtx));
+            processTemplate(result, synCtx, format);
+        }
+    }
+
+    private void processTemplate(StringBuffer result, MessageContext synCtx, String text) {
+
+        try {
+            result.append(templateProcessor.processTemplate(text, mediaType, synCtx));
+        } catch (TemplateProcessorException e) {
+            handleException(e.getMessage(), synCtx);
         }
     }
 
