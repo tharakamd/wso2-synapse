@@ -7,6 +7,7 @@ import freemarker.template.TemplateException;
 import org.apache.synapse.MessageContext;
 import org.apache.synapse.commons.json.JsonUtil;
 import org.apache.synapse.core.axis2.Axis2MessageContext;
+import org.apache.synapse.mediators.transform.ArgumentDetails;
 import org.apache.synapse.util.PayloadHelper;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
@@ -15,11 +16,15 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import javax.xml.parsers.ParserConfigurationException;
 
+import static org.apache.synapse.mediators.transform.pfutils.Constants.ARGS_INJECTING_NAME;
+import static org.apache.synapse.mediators.transform.pfutils.Constants.ARGS_INJECTING_PREFIX;
 import static org.apache.synapse.mediators.transform.pfutils.Constants.JSON_PAYLOAD_TYPE;
 import static org.apache.synapse.mediators.transform.pfutils.Constants.NOT_SUPPORTING_PAYLOAD_TYPE;
 import static org.apache.synapse.mediators.transform.pfutils.Constants.PAYLOAD_INJECTING_NAME;
@@ -40,10 +45,14 @@ public class FreeMarkerTemplateProcessor extends TemplateProcessor {
     public String processTemplate(String templateString, String mediaType, MessageContext messageContext) {
 
         try {
+            if (XML_TYPE.equals(mediaType)) {
+                templateString = "<pfPadding>" + templateString + "</pfPadding>";
+            }
             Template freeMarkerTemplate = new Template("synapse-template", templateString, cfg);
             Map<String, Object> data = new HashMap<>();
             int payloadType = getPayloadType(messageContext);
-            injectPayloadVariables(messageContext, data, payloadType);
+            injectPayloadVariables(messageContext, payloadType, data);
+            injectArgs(messageContext, mediaType, data);
             Writer out = new StringWriter();
             freeMarkerTemplate.process(data, out);
             return out.toString();
@@ -56,28 +65,118 @@ public class FreeMarkerTemplateProcessor extends TemplateProcessor {
         return "";
     }
 
-    private void injectPayloadVariables(MessageContext messageContext, Map<String, Object> data, int payloadType)
+    /**
+     * Inject argument values to freemarker
+     *
+     * @param messageContext Message context
+     * @param mediaType      Output media type
+     * @param data           Freemarker data input
+     */
+    private void injectArgs(MessageContext messageContext, String mediaType, Map<String, Object> data) {
+
+        HashMap<String, Object> argsValues = new HashMap<>();
+        HashMap<String, ArgumentDetails>[] argValues = getArgValues(mediaType, messageContext);
+        for (int i = 0; i < argValues.length; i++) {
+            HashMap<String, ArgumentDetails> argValue = argValues[i];
+            Map.Entry<String, ArgumentDetails> argumentDetailsEntry = argValue.entrySet().iterator().next();
+            String replacementValue = prepareReplacementValue(mediaType, messageContext, argumentDetailsEntry);
+            argsValues.put(ARGS_INJECTING_PREFIX + (i + 1), replacementValue);
+        }
+        data.put(ARGS_INJECTING_NAME, argsValues);
+    }
+
+    /**
+     * Inject  payload in to FreeMarker
+     *
+     * @param messageContext MessageContext
+     * @param payloadType    Input payload type
+     * @param data           FreeMarker data input
+     * @throws SAXException
+     * @throws IOException
+     * @throws ParserConfigurationException
+     */
+    private void injectPayloadVariables(MessageContext messageContext, int payloadType, Map<String, Object> data)
             throws SAXException, IOException, ParserConfigurationException {
 
         if (payloadType == XML_PAYLOAD_TYPE) {
-            data.put(PAYLOAD_INJECTING_NAME, freemarker.ext.dom.NodeModel.parse(
-                    new InputSource(new StringReader(
-                            messageContext.getEnvelope().getBody().getFirstElement().toString()))));
+            injectXmlPayload(messageContext, data);
         } else if (payloadType == JSON_PAYLOAD_TYPE) {
-            String jsonPayloadString =
-                    JsonUtil.jsonPayloadToString(((Axis2MessageContext) messageContext).getAxis2MessageContext());
-            Map<String, Object> map = new HashMap<>();
-            map = (Map<String, Object>) gson.fromJson(jsonPayloadString, map.getClass());
-            data.put(PAYLOAD_INJECTING_NAME, map);
+            injectJsonPayload((Axis2MessageContext) messageContext, data);
         }
     }
 
+    /**
+     * Inject a JSON payload in the FreeMarker
+     *
+     * @param messageContext Message context
+     * @param data           FreeMarker data input
+     */
+    private void injectJsonPayload(Axis2MessageContext messageContext, Map<String, Object> data) {
+
+        org.apache.axis2.context.MessageContext axis2MessageContext = messageContext.getAxis2MessageContext();
+        String jsonPayloadString = JsonUtil.jsonPayloadToString(axis2MessageContext);
+        if (JsonUtil.hasAJsonObject(axis2MessageContext)) {
+            injectJsonObject(data, jsonPayloadString);
+        } else {
+            injectJsonArray(data, jsonPayloadString);
+        }
+    }
+
+    /**
+     * Inject a JSON array in to FreeMarker
+     *
+     * @param data              FreeMarker data input
+     * @param jsonPayloadString JSON payload string
+     */
+    private void injectJsonArray(Map<String, Object> data, String jsonPayloadString) {
+
+        List<Object> array = new ArrayList<>();
+        array = gson.fromJson(jsonPayloadString, array.getClass());
+        data.put(PAYLOAD_INJECTING_NAME, array);
+    }
+
+    /**
+     * Inject a JSON object in to FreeMarker
+     *
+     * @param data              FreeMarker data input
+     * @param jsonPayloadString JSON payload string
+     */
+    private void injectJsonObject(Map<String, Object> data, String jsonPayloadString) {
+
+        Map<String, Object> map = new HashMap<>();
+        map = (Map<String, Object>) gson.fromJson(jsonPayloadString, map.getClass());
+        data.put(PAYLOAD_INJECTING_NAME, map);
+    }
+
+    /**
+     * Inject an XML payload in to FreeMarker
+     *
+     * @param messageContext Message context
+     * @param data           FreeMarker data input
+     * @throws SAXException
+     * @throws IOException
+     * @throws ParserConfigurationException
+     */
+    private void injectXmlPayload(MessageContext messageContext, Map<String, Object> data)
+            throws SAXException, IOException, ParserConfigurationException {
+
+        data.put(PAYLOAD_INJECTING_NAME, freemarker.ext.dom.NodeModel.parse(
+                new InputSource(new StringReader(
+                        messageContext.getEnvelope().getBody().getFirstElement().toString()))));
+    }
+
+    /**
+     * Get the input payload type
+     *
+     * @param messageContext Message context
+     * @return Type of the input paylaod
+     */
     private int getPayloadType(MessageContext messageContext) {
 
         if (PayloadHelper.getPayloadType(messageContext) == PayloadHelper.XMLPAYLOADTYPE) {
             if (JsonUtil.hasAJsonPayload(((Axis2MessageContext) messageContext).getAxis2MessageContext())) {
                 return JSON_PAYLOAD_TYPE;
-            }else{
+            } else {
                 return XML_PAYLOAD_TYPE;
             }
         } else {

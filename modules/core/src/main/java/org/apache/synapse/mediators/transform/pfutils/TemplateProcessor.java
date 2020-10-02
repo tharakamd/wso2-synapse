@@ -4,9 +4,12 @@ import org.apache.axiom.om.OMElement;
 import org.apache.axiom.om.OMException;
 import org.apache.axiom.om.impl.builder.StAXBuilder;
 import org.apache.axiom.om.impl.builder.StAXOMBuilder;
+import org.apache.axis2.AxisFault;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.synapse.MessageContext;
+import org.apache.synapse.commons.json.JsonUtil;
 import org.apache.synapse.config.xml.SynapsePath;
 import org.apache.synapse.mediators.transform.Argument;
 import org.apache.synapse.mediators.transform.ArgumentDetails;
@@ -18,15 +21,19 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
+
+import static org.apache.synapse.mediators.transform.PayloadFactoryMediator.QUOTE_STRING_IN_PAYLOAD_FACTORY_JSON;
 
 public abstract class TemplateProcessor {
 
@@ -44,6 +51,7 @@ public abstract class TemplateProcessor {
     protected final static String ESCAPE_NEWLINE_WITH_EIGHT_BACK_SLASHES = "\\\\\\\\n";
     protected final static String ESCAPE_CRETURN_WITH_EIGHT_BACK_SLASHES = "\\\\\\\\r";
     protected final static String ESCAPE_TAB_WITH_EIGHT_BACK_SLASHES = "\\\\\\\\t";
+    private static final Pattern validJsonNumber = Pattern.compile("^-?(0|([1-9]\\d*))(\\.\\d+)?([eE][+-]?\\d+)?$");
     protected final XMLInputFactory inputFactory = XMLInputFactory.newInstance();
     private boolean escapeXmlChars = false;
     private final List<Argument> pathArgumentList = new ArrayList<>();
@@ -103,6 +111,159 @@ public abstract class TemplateProcessor {
             argValues[i] = valueMap;
         }
         return argValues;
+    }
+
+    /**
+     * Preprocess and converty types of the given arg value.
+     *
+     * @param mediaType        Output media type
+     * @param synCtx           Message context
+     * @param replacementEntry Argument
+     * @return Preprocessed value
+     */
+    protected String prepareReplacementValue(String mediaType, MessageContext synCtx,
+                                             Map.Entry<String, ArgumentDetails> replacementEntry) {
+
+        String replacementValue = null;
+
+        if (mediaType.equals(JSON_TYPE) && inferReplacementType(replacementEntry).equals(XML_TYPE)) {
+            // XML to JSON conversion here
+            replacementValue = convertXmlArgumentToJson(replacementEntry, replacementValue);
+        } else if (mediaType.equals(XML_TYPE) && inferReplacementType(replacementEntry).equals(JSON_TYPE)) {
+            // JSON to XML conversion here
+            replacementValue = convertJsonArgumentToXml(replacementEntry, replacementValue);
+        } else {
+            // No conversion required, as path evaluates to regular String.
+            replacementValue = replacementEntry.getKey();
+            String trimmedReplacementValue = replacementValue.trim();
+            //If media type is xml and replacement value is json convert it to xml format prior to replacement
+            if (mediaType.equals(XML_TYPE) && inferReplacementType(replacementEntry).equals(STRING_TYPE)
+                    && isJson(trimmedReplacementValue)) {
+                replacementValue = convertJsonStringToXml(replacementValue);
+            } else if (mediaType.equals(JSON_TYPE) &&
+                    inferReplacementType(replacementEntry).equals(JSON_TYPE) &&
+                    isEscapeXmlChars()) {
+                //checks whether the escapeXmlChars attribute is true when media-type and evaluator is json and
+                //escapes xml chars. otherwise json messages with non escaped xml characters will fail to build
+                //in content aware mediators.
+                replacementValue = escapeXMLSpecialChars(replacementValue);
+            } else if (mediaType.equals(JSON_TYPE) &&
+                    inferReplacementType(replacementEntry).equals(STRING_TYPE) &&
+                    (!trimmedReplacementValue.startsWith("{") && !trimmedReplacementValue.startsWith("["))) {
+                replacementValue = escapeSpecialChars(replacementValue);
+                // Check for following property which will force the string to include quotes
+                Object force_string_quote = synCtx.getProperty(QUOTE_STRING_IN_PAYLOAD_FACTORY_JSON);
+                // skip double quotes if replacement is boolean or null or valid json number
+                if (force_string_quote != null && ((String) force_string_quote).equalsIgnoreCase("true")
+                        && !trimmedReplacementValue.equals("true") && !trimmedReplacementValue.equals("false")
+                        && !trimmedReplacementValue.equals("null")
+                        && !validJsonNumber.matcher(trimmedReplacementValue).matches()) {
+                    replacementValue = "\"" + replacementValue + "\"";
+                }
+            } else if (
+                    (mediaType.equals(JSON_TYPE) && inferReplacementType(replacementEntry).equals(JSON_TYPE)) &&
+                            (!trimmedReplacementValue.startsWith("{") &&
+                                    !trimmedReplacementValue.startsWith("["))) {
+                // This is to handle only the string value
+                replacementValue =
+                        replacementValue.replaceAll("\"", ESCAPE_DOUBLE_QUOTE_WITH_NINE_BACK_SLASHES);
+            }
+        }
+        return replacementValue;
+    }
+
+    /**
+     * Convert Json string value to XML
+     *
+     * @param replacementValue Replacement value string
+     * @return Converted value
+     */
+    private String convertJsonStringToXml(String replacementValue) {
+
+        try {
+            replacementValue = escapeSpecialCharactersOfXml(replacementValue);
+            OMElement omXML = JsonUtil.toXml(IOUtils.toInputStream(replacementValue), false);
+            if (JsonUtil.isAJsonPayloadElement(omXML)) { // remove <jsonObject/> from result.
+                Iterator children = omXML.getChildElements();
+                String childrenStr = "";
+                while (children.hasNext()) {
+                    childrenStr += (children.next()).toString().trim();
+                }
+                replacementValue = childrenStr;
+            } else {
+                replacementValue = omXML.toString();
+            }
+        } catch (AxisFault e) {
+            handleException("Error converting JSON to XML, please check your JSON Path expressions"
+                    + " return valid JSON: ");
+        }
+        return replacementValue;
+    }
+
+    /**
+     * Convert JSON argument to XML
+     *
+     * @param replacementEntry Argument
+     * @param replacementValue Replacement Value
+     * @return
+     */
+    private String convertJsonArgumentToXml(Map.Entry<String, ArgumentDetails> replacementEntry,
+                                            String replacementValue) {
+
+        try {
+            replacementValue = replacementEntry.getKey();
+            replacementValue = escapeSpecialCharactersOfXml(replacementValue);
+            OMElement omXML = JsonUtil.toXml(IOUtils.toInputStream(replacementValue), false);
+            if (JsonUtil.isAJsonPayloadElement(omXML)) { // remove <jsonObject/> from result.
+                Iterator children = omXML.getChildElements();
+                String childrenStr = "";
+                while (children.hasNext()) {
+                    childrenStr += (children.next()).toString().trim();
+                }
+                replacementValue = childrenStr;
+            } else { ///~
+                replacementValue = omXML.toString();
+            }
+            //replacementValue = omXML.toString();
+        } catch (AxisFault e) {
+            handleException(
+                    "Error converting JSON to XML, please check your JSON Path expressions return valid JSON: ");
+        }
+        return replacementValue;
+    }
+
+    /**
+     * Convert XML argument to JSON
+     *
+     * @param replacementEntry Entity
+     * @param replacementValue Replacement value
+     * @return Converted value
+     */
+    private String convertXmlArgumentToJson(Map.Entry<String, ArgumentDetails> replacementEntry,
+                                            String replacementValue) {
+
+        try {
+            replacementValue = "<jsonObject>" + replacementEntry.getKey() + "</jsonObject>";
+            OMElement omXML = convertStringToOM(replacementValue);
+            replacementValue = JsonUtil.toJsonString(omXML).toString();
+            replacementValue = escapeSpecialCharactersOfJson(replacementValue);
+        } catch (XMLStreamException e) {
+            handleException(
+                    "Error parsing XML for JSON conversion, please check your xPath expressions return valid XML: ");
+        } catch (AxisFault e) {
+            handleException("Error converting XML to JSON");
+        } catch (OMException e) {
+            //if the logic comes to this means, it was tried as a XML, which means it has
+            // "<" as starting element and ">" as end element, so basically if the logic comes here, that means
+            //value is a string value, that means No conversion required, as path evaluates to regular String.
+            replacementValue = replacementEntry.getKey();
+
+            // This is to replace " with \" and \\ with \\\\
+            //replacing other json special characters i.e \b, \f, \n \r, \t
+            replacementValue = escapeSpecialChars(replacementValue);
+
+        }
+        return replacementValue;
     }
 
     /**
@@ -334,4 +495,5 @@ public abstract class TemplateProcessor {
 
         throw new TemplateProcessorException(msg);
     }
+
 }
