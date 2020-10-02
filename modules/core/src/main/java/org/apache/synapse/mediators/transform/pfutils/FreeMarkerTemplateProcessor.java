@@ -37,16 +37,21 @@ import java.io.StringWriter;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.xml.parsers.ParserConfigurationException;
 
 import static org.apache.synapse.mediators.transform.pfutils.Constants.ARGS_INJECTING_NAME;
 import static org.apache.synapse.mediators.transform.pfutils.Constants.ARGS_INJECTING_PREFIX;
+import static org.apache.synapse.mediators.transform.pfutils.Constants.AXIS2_PROPERTY_INJECTING_NAME;
+import static org.apache.synapse.mediators.transform.pfutils.Constants.CTX_PROPERTY_INJECTING_NAME;
 import static org.apache.synapse.mediators.transform.pfutils.Constants.JSON_PAYLOAD_TYPE;
 import static org.apache.synapse.mediators.transform.pfutils.Constants.NOT_SUPPORTING_PAYLOAD_TYPE;
 import static org.apache.synapse.mediators.transform.pfutils.Constants.PAYLOAD_INJECTING_NAME;
+import static org.apache.synapse.mediators.transform.pfutils.Constants.TRANSPORT_PROPERTY_INJECTING_NAME;
 import static org.apache.synapse.mediators.transform.pfutils.Constants.XML_PAYLOAD_TYPE;
 
 public class FreeMarkerTemplateProcessor extends TemplateProcessor {
@@ -72,6 +77,7 @@ public class FreeMarkerTemplateProcessor extends TemplateProcessor {
             int payloadType = getPayloadType(messageContext);
             injectPayloadVariables(messageContext, payloadType, data);
             injectArgs(messageContext, mediaType, data);
+            injectProperties(messageContext, data);
             Writer out = new StringWriter();
             freeMarkerTemplate.process(data, out);
             return out.toString();
@@ -182,6 +188,62 @@ public class FreeMarkerTemplateProcessor extends TemplateProcessor {
         data.put(PAYLOAD_INJECTING_NAME, freemarker.ext.dom.NodeModel.parse(
                 new InputSource(new StringReader(
                         messageContext.getEnvelope().getBody().getFirstElement().toString()))));
+    }
+
+    private void injectProperties(MessageContext synCtx, Map<String, Object> data) {
+
+        injectCtxProperties(synCtx, data);
+        injectAxis2Properties(synCtx, data);
+        injectTransportProperties(synCtx, data);
+    }
+
+    private void injectCtxProperties(MessageContext synCtx, Map<String, Object> data) {
+
+        Map<String, String> properties = new HashMap<>();
+        Set propertyKeys = synCtx.getPropertyKeySet();
+        for (Object propertyKey : propertyKeys) {
+            String propertyKeyString = propertyKey.toString();
+            Object propertyValue = synCtx.getProperty(propertyKeyString);
+            if (propertyValue != null) {
+                properties.put(propertyKeyString, propertyValue.toString());
+            }
+        }
+        data.put(CTX_PROPERTY_INJECTING_NAME, properties);
+    }
+
+    private void injectAxis2Properties(MessageContext synCtx, Map<String, Object> data) {
+
+        Map<String, String> properties = new HashMap<>();
+        org.apache.axis2.context.MessageContext axis2MessageContext
+                = ((Axis2MessageContext) synCtx).getAxis2MessageContext();
+        Iterator<String> propertyNames = axis2MessageContext.getPropertyNames();
+        while (propertyNames.hasNext()) {
+            String propertyName = propertyNames.next();
+            Object propertyValue = axis2MessageContext.getProperty(propertyName);
+            if (propertyValue != null) {
+                properties.put(propertyName, propertyValue.toString());
+            }
+        }
+        data.put(AXIS2_PROPERTY_INJECTING_NAME, properties);
+    }
+
+    private void injectTransportProperties(MessageContext synCtx, Map<String, Object> data) {
+
+        Map<String, String> properties = new HashMap<>();
+        org.apache.axis2.context.MessageContext axis2MessageContext
+                = ((Axis2MessageContext) synCtx).getAxis2MessageContext();
+        Object headers = axis2MessageContext.getProperty(
+                org.apache.axis2.context.MessageContext.TRANSPORT_HEADERS);
+        if (headers instanceof Map) {
+            Map headersMap = (Map) headers;
+            for (Object propertyKey : headersMap.keySet()) {
+                Object propertyValue = headersMap.get(propertyKey);
+                if (propertyValue != null) {
+                    properties.put(propertyKey.toString(), propertyValue.toString());
+                }
+            }
+        }
+        data.put(TRANSPORT_PROPERTY_INJECTING_NAME, properties);
     }
 
     /**
