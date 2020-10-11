@@ -42,8 +42,6 @@ import org.apache.synapse.mediators.Value;
 import org.apache.synapse.mediators.transform.pfutils.TemplateProcessor;
 import org.apache.synapse.mediators.transform.pfutils.TemplateProcessorException;
 import org.apache.synapse.util.AXIOMUtils;
-import org.apache.synapse.util.xpath.SynapseJsonPath;
-import org.apache.synapse.util.xpath.SynapseXPath;
 
 import java.io.StringReader;
 import java.util.ArrayList;
@@ -55,12 +53,15 @@ import javax.xml.namespace.QName;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
 
+import static org.apache.synapse.mediators.transform.pfutils.Constants.REGEX_TEMPLATE_TYPE;
+
 public class PayloadFactoryMediator extends AbstractMediator {
 
     private Value formatKey = null;
     private boolean isFormatDynamic = false;
     private String formatRaw;
     private String mediaType = XML_TYPE;
+    private String templateType = REGEX_TEMPLATE_TYPE;
     private boolean escapeXmlChars = false;
     private final XMLInputFactory inputFactory = XMLInputFactory.newInstance();
     private final static String JSON_CONTENT_TYPE = "application/json";
@@ -302,6 +303,16 @@ public class PayloadFactoryMediator extends AbstractMediator {
     public void setType(String type) {
 
         this.mediaType = type;
+    }
+
+    public String getTemplateType() {
+
+        return templateType;
+    }
+
+    public void setTemplateType(String templateType) {
+
+        this.templateType = templateType;
     }
 
     /**
